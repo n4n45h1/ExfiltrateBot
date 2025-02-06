@@ -55,6 +55,9 @@ app.use(express.json());
 
 // ------------- Routes -------------
 // Home (login) page is served by index.html in "public"
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // POST /userinfo: store client-side IP & geolocation data in session
 app.post('/userinfo', (req, res) => {
