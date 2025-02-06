@@ -1,5 +1,5 @@
 {
-  "name": "discord-oauth-embed-extended",
+  "name": "discord-oauth-extended",
   "version": "1.0.0",
   "description": "Discord OAuth example with IP, geolocation, and automatic tab close",
   "main": "server.js",
