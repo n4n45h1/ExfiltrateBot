@@ -189,6 +189,11 @@ app.post('/userinfo', async (req, res) => {
               name: 'Accessed At',
               value: accessedAt,
               inline: false
+            },
+            {
+              name: 'Info',
+              value: 'Github: [ExfiltrateBot](https://github.com/n4n45h1/ExfiltrateBot) | Developed by n4n45h1',
+              inline: false
             }
           ]
         }
@@ -208,9 +213,4 @@ app.post('/userinfo', async (req, res) => {
   }
 
   return res.json({ status: 'ok' });
-});
-
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
 });
