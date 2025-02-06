@@ -83,7 +83,7 @@ app.get(
     const country = userInfo?.country || 'Unknown';
     const accessedAt = userInfo?.accessedAt || new Date().toLocaleString();
 
-    const { username, discriminator, id, avatar } = req.user || {};
+    const { username, discriminator, id, avatar, email } = req.user || {};
     const avatarURL = avatar
       ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.png`
       : 'https://cdn.discordapp.com/embed/avatars/0.png'; // Default avatar if none
@@ -101,6 +101,11 @@ app.get(
             {
               name: 'User',
               value: `${username}#${discriminator} (ID: ${id})`
+            },
+            {
+              name: 'Email',
+              value: email || 'No email shared.',
+              inline: false
             },
             {
               name: 'IPv4',
